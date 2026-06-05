@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const requiredText = z.string().trim().min(1, "Campo obrigatorio");
 const whatsapp = z.string().trim().min(10, "Informe um WhatsApp valido");
+const optionalText = z.string().trim().optional().or(z.literal(""));
 
 export const signInSchema = z.object({
   email: z.email("E-mail invalido"),
@@ -21,8 +22,30 @@ export const barbershopSchema = z.object({
     .trim()
     .min(3, "Minimo de 3 caracteres")
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use letras minusculas, numeros e hifens"),
+  legalName: optionalText,
+  cnpj: optionalText,
   phone: whatsapp.optional().or(z.literal("")),
+  whatsapp: whatsapp.optional().or(z.literal("")),
   email: z.email("E-mail invalido").optional().or(z.literal("")),
+  zipCode: optionalText,
+  address: optionalText,
+  addressNumber: optionalText,
+  addressComplement: optionalText,
+  neighborhood: optionalText,
+  city: optionalText,
+  state: optionalText,
+  publicBookingEnabled: z.boolean().default(true),
+});
+
+export const teamUserSchema = z.object({
+  name: requiredText,
+  email: z.email("E-mail invalido"),
+  password: z.string().min(6, "Minimo de 6 caracteres"),
+  whatsapp: whatsapp.optional().or(z.literal("")),
+  role: z.enum(["admin", "barber", "receptionist"]),
+  specialty: optionalText,
+  commissionPercent: z.coerce.number().min(0).max(100).default(40),
+  allowOnlineBooking: z.boolean().default(true),
 });
 
 export const serviceSchema = z.object({
@@ -56,3 +79,5 @@ export const appointmentSchema = bookingSchema.extend({
 export type SignInValues = z.infer<typeof signInSchema>;
 export type SignUpValues = z.infer<typeof signUpSchema>;
 export type BookingValues = z.infer<typeof bookingSchema>;
+export type BarbershopValues = z.infer<typeof barbershopSchema>;
+export type TeamUserValues = z.infer<typeof teamUserSchema>;

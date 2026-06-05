@@ -1,4 +1,5 @@
 import type { PublicBookingData } from "@/lib/types";
+import { getSupabaseAdmin } from "./admin";
 import { createClient } from "./server";
 
 type NamedRelation = { name?: string } | { name?: string }[] | null;
@@ -165,13 +166,14 @@ export async function getDashboardData() {
 
 export async function getModuleRows(moduleKey: string) {
   const supabase = await createClient();
-  const { membership } = await getSessionContext();
+  const { user, membership } = await getSessionContext();
 
-  if (!supabase || !membership?.barbershop_id) {
+  if (!supabase || !user || !membership?.barbershop_id) {
     return [];
   }
 
   const barbershopId = membership.barbershop_id as string;
+  const role = membership.role as string;
 
   if (moduleKey === "servicos") {
     const { data } = await supabase
@@ -219,12 +221,34 @@ export async function getModuleRows(moduleKey: string) {
   }
 
   if (moduleKey === "agenda") {
-    const { data } = await supabase
+    let barberId: string | null = null;
+
+    if (role === "barber") {
+      const { data: barber } = await supabase
+        .from("barbers")
+        .select("id")
+        .eq("barbershop_id", barbershopId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      barberId = barber?.id ?? null;
+    }
+
+    let query = supabase
       .from("appointments")
       .select("starts_at,status,customers(name),barbers(name),services(name)")
       .eq("barbershop_id", barbershopId)
       .order("starts_at", { ascending: true })
       .limit(30);
+
+    if (role === "barber") {
+      if (!barberId) {
+        return [];
+      }
+
+      query = query.eq("barber_id", barberId);
+    }
+
+    const { data } = await query;
     return (data ?? []).map((row) => {
       const item = row as {
         customers?: NamedRelation;
@@ -244,4 +268,91 @@ export async function getModuleRows(moduleKey: string) {
   }
 
   return [];
+}
+
+export async function getSettingsData() {
+  const { user, membership } = await getSessionContext();
+  const admin = getSupabaseAdmin();
+
+  if (!user || !membership?.barbershop_id || !admin) {
+    return null;
+  }
+
+  const barbershopId = membership.barbershop_id as string;
+  const role = membership.role as string;
+  const canManage = role === "owner" || role === "admin";
+
+  const [{ data: barbershop }, { data: settings }, { data: memberships }, { data: barbers }] = await Promise.all([
+    admin
+      .from("barbershops")
+      .select("id,name,slug,phone,whatsapp,email,address,city,state,active")
+      .eq("id", barbershopId)
+      .single(),
+    admin
+      .from("settings")
+      .select("id,public_booking_enabled,payment_methods,theme")
+      .eq("barbershop_id", barbershopId)
+      .maybeSingle(),
+    admin
+      .from("barbershop_users")
+      .select("id,user_id,role,active,created_at")
+      .eq("barbershop_id", barbershopId)
+      .order("created_at", { ascending: true }),
+    admin
+      .from("barbers")
+      .select("id,user_id,name,email,whatsapp,specialty,default_commission_percent,allow_online_booking,active")
+      .eq("barbershop_id", barbershopId),
+  ]);
+
+  const userIds = (memberships ?? []).map((item) => item.user_id).filter(Boolean);
+  const { data: profiles } = userIds.length
+    ? await admin.from("profiles").select("id,name,email,phone").in("id", userIds)
+    : { data: [] };
+
+  const theme = (settings?.theme ?? {}) as {
+    company?: {
+      legal_name?: string | null;
+      cnpj?: string | null;
+      zip_code?: string | null;
+      address_number?: string | null;
+      address_complement?: string | null;
+      neighborhood?: string | null;
+    };
+  };
+
+  return {
+    currentUserId: user.id,
+    currentRole: role,
+    canManage,
+    barbershop: barbershop
+      ? {
+          ...barbershop,
+          legal_name: theme.company?.legal_name ?? null,
+          cnpj: theme.company?.cnpj ?? null,
+          zip_code: theme.company?.zip_code ?? null,
+          address_number: theme.company?.address_number ?? null,
+          address_complement: theme.company?.address_complement ?? null,
+          neighborhood: theme.company?.neighborhood ?? null,
+        }
+      : null,
+    settings,
+    users: (memberships ?? []).map((item) => {
+      const profile = profiles?.find((profileItem) => profileItem.id === item.user_id);
+      const barber = barbers?.find((barberItem) => barberItem.user_id === item.user_id);
+
+      return {
+        id: item.id,
+        userId: item.user_id,
+        role: item.role,
+        active: item.active,
+        name: profile?.name ?? barber?.name ?? "-",
+        email: profile?.email ?? barber?.email ?? "-",
+        phone: profile?.phone ?? barber?.whatsapp ?? "-",
+        barberId: barber?.id ?? null,
+        specialty: barber?.specialty ?? null,
+        commissionPercent: barber?.default_commission_percent ?? null,
+        allowOnlineBooking: barber?.allow_online_booking ?? null,
+      };
+    }),
+  };
 }
