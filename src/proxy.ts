@@ -17,7 +17,9 @@ const privatePrefixes = [
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
-  const isPrivate = privatePrefixes.some((prefix) => request.nextUrl.pathname.startsWith(prefix));
+  const isPrivate = privatePrefixes.some(
+    (prefix) => request.nextUrl.pathname === prefix || request.nextUrl.pathname.startsWith(`${prefix}/`),
+  );
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
