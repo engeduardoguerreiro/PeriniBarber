@@ -2,11 +2,18 @@ import { AppShell } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { dashboardCards } from "@/lib/app-data";
-import { getSessionContext } from "@/lib/supabase/queries";
+import { formatCurrency } from "@/lib/format";
+import { getDashboardData, getSessionContext } from "@/lib/supabase/queries";
+
+type NamedRelation = { name?: string } | { name?: string }[] | null;
+
+function relationName(relation: NamedRelation) {
+  return Array.isArray(relation) ? relation[0]?.name : relation?.name;
+}
 
 export default async function DashboardPage() {
   const { user, membership } = await getSessionContext();
+  const dashboard = await getDashboardData();
 
   return (
     <AppShell>
@@ -21,11 +28,13 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          {dashboardCards.map((card) => (
+          {(dashboard?.cards ?? []).map((card) => (
             <Card key={card.label} className="border-border bg-card">
               <CardHeader className="pb-2">
                 <CardDescription>{card.label}</CardDescription>
-                <CardTitle className="text-2xl">{card.value}</CardTitle>
+                <CardTitle className="text-2xl">
+                  {card.type === "money" ? formatCurrency(Number(card.value)) : card.value}
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">{card.hint}</CardContent>
             </Card>
@@ -43,7 +52,26 @@ export default async function DashboardPage() {
                   <TableRow><TableHead>Horario</TableHead><TableHead>Cliente</TableHead><TableHead>Barbeiro</TableHead><TableHead>Status</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Sem horarios para exibir.</TableCell></TableRow>
+                  {dashboard?.nextAppointments.length ? (
+                    dashboard.nextAppointments.map((appointment) => {
+                      const item = appointment as {
+                        customers?: NamedRelation;
+                        barbers?: NamedRelation;
+                      };
+                      const customer = relationName(item.customers ?? null);
+                      const barber = relationName(item.barbers ?? null);
+                      return (
+                        <TableRow key={appointment.id}>
+                          <TableCell>{new Date(appointment.starts_at).toLocaleString("pt-BR")}</TableCell>
+                          <TableCell>{customer ?? "-"}</TableCell>
+                          <TableCell>{barber ?? "-"}</TableCell>
+                          <TableCell>{appointment.status}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : (
+                    <TableRow><TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Sem horarios para exibir.</TableCell></TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

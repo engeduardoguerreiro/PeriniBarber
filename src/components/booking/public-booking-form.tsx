@@ -27,6 +27,7 @@ export function PublicBookingForm({
   services: Service[];
 }) {
   const [confirmed, setConfirmed] = useState<Values | null>(null);
+  const [saving, setSaving] = useState(false);
   const form = useForm<Values>({
     resolver: zodResolver(bookingSchema),
     defaultValues: { date: "", time: "", notes: "" },
@@ -36,9 +37,25 @@ export function PublicBookingForm({
   const selectedService = services.find((service) => service.id === serviceId);
   const selectedBarber = barbers.find((barber) => barber.id === barberId);
 
-  function onSubmit(values: Values) {
-    setConfirmed(values);
-    toast.success("Agendamento pronto para envio. Conecte a action Supabase para gravar.");
+  async function onSubmit(values: Values) {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/public-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...values, barbershopId: barbershop.id }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? "Nao foi possivel confirmar o agendamento.");
+      }
+      setConfirmed(values);
+      toast.success("Agendamento confirmado com sucesso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nao foi possivel confirmar o agendamento.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (confirmed) {
@@ -128,7 +145,7 @@ export function PublicBookingForm({
           <Field label="Observacoes" error={form.formState.errors.notes?.message}>
             <Textarea {...form.register("notes")} placeholder="Preferencias ou observacoes" />
           </Field>
-          <Button>Confirmar agendamento</Button>
+          <Button disabled={saving}>{saving ? "Confirmando..." : "Confirmar agendamento"}</Button>
         </form>
       </CardContent>
     </Card>

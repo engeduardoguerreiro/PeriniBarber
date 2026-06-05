@@ -7,7 +7,7 @@ import { Plus } from "lucide-react";
 
 type ModuleKey = keyof typeof modules;
 
-export function ModulePage({ moduleKey }: { moduleKey: ModuleKey }) {
+export function ModulePage({ moduleKey, rows = [] }: { moduleKey: ModuleKey; rows?: string[][] }) {
   const moduleConfig = modules[moduleKey];
 
   return (
@@ -39,11 +39,21 @@ export function ModulePage({ moduleKey }: { moduleKey: ModuleKey }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow>
-                <TableCell colSpan={moduleConfig.table.length} className="h-32 text-center text-muted-foreground">
-                  {moduleConfig.empty}
-                </TableCell>
-              </TableRow>
+              {rows.length ? (
+                rows.map((row, index) => (
+                  <TableRow key={`${moduleKey}-${index}`}>
+                    {row.map((cell, cellIndex) => (
+                      <TableCell key={`${moduleKey}-${index}-${cellIndex}`}>{cell}</TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={moduleConfig.table.length} className="h-32 text-center text-muted-foreground">
+                    {moduleConfig.empty}
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

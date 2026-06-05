@@ -31,12 +31,21 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setLoading(true);
     try {
       const supabase = createClient();
+      async function ensureOnboarding() {
+        const response = await fetch("/api/onboarding/ensure", { method: "POST" });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => null);
+          throw new Error(payload?.error ?? "Nao foi possivel preparar a barbearia.");
+        }
+      }
+
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({
           email: values.email,
           password: values.password,
         });
         if (error) throw error;
+        await ensureOnboarding();
         router.push("/dashboard");
         router.refresh();
         return;
@@ -55,8 +64,17 @@ export function AuthForm({ mode }: { mode: Mode }) {
         },
       });
       if (error) throw error;
-      toast.success("Cadastro criado. Verifique seu e-mail para confirmar o acesso.");
-      router.push("/login");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        await ensureOnboarding();
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        toast.success("Cadastro criado. Verifique seu e-mail para confirmar o acesso.");
+        router.push("/login");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel concluir a acao.");
     } finally {
