@@ -51,30 +51,26 @@ export function AuthForm({ mode }: { mode: Mode }) {
         return;
       }
 
-      const { error } = await supabase.auth.signUp({
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Nao foi possivel criar a conta.");
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
         email: values.email,
         password: values.password,
-        options: {
-          data: {
-            name: values.name,
-            barbershop_name: values.barbershopName,
-            whatsapp: values.whatsapp,
-          },
-          emailRedirectTo: `${location.origin}/auth/callback`,
-        },
       });
+
       if (error) throw error;
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session) {
-        await ensureOnboarding();
-        router.push("/dashboard");
-        router.refresh();
-      } else {
-        toast.success("Cadastro criado. Verifique seu e-mail para confirmar o acesso.");
-        router.push("/login");
-      }
+
+      router.push("/dashboard");
+      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Nao foi possivel concluir a acao.");
     } finally {
