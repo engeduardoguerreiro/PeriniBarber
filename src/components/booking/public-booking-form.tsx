@@ -145,7 +145,9 @@ export function PublicBookingForm({
           <Field label="Observacoes" error={form.formState.errors.notes?.message}>
             <Textarea {...form.register("notes")} placeholder="Preferencias ou observacoes" />
           </Field>
-          <Button disabled={saving}>{saving ? "Confirmando..." : "Confirmar agendamento"}</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Confirmando..." : "Confirmar agendamento"}
+          </Button>
         </form>
       </CardContent>
     </Card>

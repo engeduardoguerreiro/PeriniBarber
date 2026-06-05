@@ -113,7 +113,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           <Field label="Senha" error={errors.password?.message}>
             <Input {...register("password")} type="password" placeholder="******" />
           </Field>
-          <Button className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
           </Button>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
